@@ -127,3 +127,6 @@ temp.ipynb
 Falcon1.tar.gz
 data.tar.gz
 20250805_183840.tar.gz
+
+# Data directories
+falcon_imitation_data/
