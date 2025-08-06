@@ -294,7 +294,7 @@ class FALCONEvaluator(Evaluator):
                         if rgb_data.dtype != np.uint8:
                             rgb_data = (rgb_data * 255).astype(np.uint8)
                         imitation_learning_data['jaw_rgb_data'][i].append(rgb_data)
-                        print(f"[DEBUG] 收集 RGB 数据: env={i}, shape={rgb_data.shape}, dtype={rgb_data.dtype}")
+                        # print(f"[DEBUG] 收集 RGB 数据: env={i}, shape={rgb_data.shape}, dtype={rgb_data.dtype}")
                     else:
                         print(f"[DEBUG] 未找到 'agent_0_articulated_agent_jaw_rgb' 键，batch 中的键: {list(batch.keys())}")
                     
@@ -306,7 +306,7 @@ class FALCONEvaluator(Evaluator):
                         if depth_data.dtype != np.float32:
                             depth_data = depth_data.astype(np.float32)
                         imitation_learning_data['jaw_depth_data'][i].append(depth_data)
-                        print(f"[DEBUG] 收集深度数据: env={i}, shape={depth_data.shape}, dtype={depth_data.dtype}")
+                        # print(f"[DEBUG] 收集深度数据: env={i}, shape={depth_data.shape}, dtype={depth_data.dtype}")
                     else:
                         print(f"[DEBUG] 未找到 'agent_0_articulated_agent_jaw_depth' 键，batch 中的键: {list(batch.keys())}")
                     

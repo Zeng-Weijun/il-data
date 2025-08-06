@@ -7,11 +7,11 @@
 from habitat_baselines.common.base_il_trainer import BaseILTrainer
 from habitat_baselines.common.base_trainer import BaseRLTrainer, BaseTrainer
 from habitat_baselines.common.rollout_storage import RolloutStorage
-from habitat_baselines.il.trainers.eqa_cnn_pretrain_trainer import (
-    EQACNNPretrainTrainer,
-)
-from habitat_baselines.il.trainers.pacman_trainer import PACMANTrainer
-from habitat_baselines.il.trainers.vqa_trainer import VQATrainer
+# from habitat_baselines.il.trainers.eqa_cnn_pretrain_trainer import (
+#     EQACNNPretrainTrainer,
+# )
+# from habitat_baselines.il.trainers.pacman_trainer import PACMANTrainer
+# from habitat_baselines.il.trainers.vqa_trainer import VQATrainer
 from habitat_baselines.rl.ppo.ppo_trainer import PPOTrainer
 from habitat_baselines.rl.ver.ver_trainer import VERTrainer
 from habitat_baselines.rl.ppo.orca_trainer import ORCANoTrainer
