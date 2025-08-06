@@ -1,0 +1,170 @@
+<svg width="1000" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; text-anchor: middle; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; text-anchor: middle; }
+      .label { font-family: Arial, sans-serif; font-size: 12px; text-anchor: middle; }
+      .small-label { font-family: Arial, sans-serif; font-size: 10px; text-anchor: middle; }
+      .input { fill: #e3f2fd; stroke: #1976d2; stroke-width: 2; }
+      .planner { fill: #f3e5f5; stroke: #7b1fa2; stroke-width: 2; }
+      .controller { fill: #e8f5e8; stroke: #388e3c; stroke-width: 2; }
+      .rnn { fill: #fff3e0; stroke: #f57c00; stroke-width: 2; }
+      .fusion { fill: #fce4ec; stroke: #c2185b; stroke-width: 2; }
+      .output { fill: #f1f8e9; stroke: #689f38; stroke-width: 2; }
+      .arrow { stroke: #333; stroke-width: 2; marker-end: url(#arrowhead); }
+      .hierarchy { stroke: #9c27b0; stroke-width: 3; stroke-dasharray: 8,4; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="500" y="25" class="title">PACMAN导航模型架构 (NavPlannerControllerModel)</text>
+  
+  <!-- Input Layer -->
+  <text x="500" y="60" class="subtitle">多模态输入层</text>
+  
+  <rect x="50" y="80" width="120" height="50" class="input" />
+  <text x="110" y="105" class="label">图像特征</text>
+  <text x="110" y="115" class="small-label">(batch, 512)</text>
+  
+  <rect x="200" y="80" width="120" height="50" class="input" />
+  <text x="260" y="105" class="label">问题特征</text>
+  <text x="260" y="115" class="small-label">(batch, 512)</text>
+  
+  <rect x="350" y="80" width="120" height="50" class="input" />
+  <text x="410" y="105" class="label">历史动作</text>
+  <text x="410" y="115" class="small-label">(batch, action_dim)</text>
+  
+  <rect x="500" y="80" width="120" height="50" class="input" />
+  <text x="560" y="105" class="label">目标特征</text>
+  <text x="560" y="115" class="small-label">(batch, target_dim)</text>
+  
+  <rect x="650" y="80" width="120" height="50" class="input" />
+  <text x="710" y="105" class="label">环境状态</text>
+  <text x="710" y="115" class="small-label">(batch, state_dim)</text>
+  
+  <!-- Feature Fusion -->
+  <rect x="300" y="170" width="200" height="50" class="fusion" />
+  <text x="400" y="195" class="label">多模态特征融合</text>
+  <text x="400" y="205" class="small-label">Concatenation + Linear</text>
+  
+  <!-- Planner Module -->
+  <rect x="100" y="270" width="300" height="80" class="planner" rx="10" />
+  <text x="250" y="290" class="subtitle">规划器模块 (Planner)</text>
+  
+  <rect x="120" y="310" width="100" height="30" class="rnn" />
+  <text x="170" y="330" class="small-label">NavRnn (LSTM)</text>
+  
+  <rect x="280" y="310" width="100" height="30" class="planner" />
+  <text x="330" y="330" class="small-label">高级动作预测</text>
+  
+  <!-- Controller Module -->
+  <rect x="500" y="270" width="300" height="80" class="controller" rx="10" />
+  <text x="650" y="290" class="subtitle">控制器模块 (Controller)</text>
+  
+  <rect x="520" y="310" width="100" height="30" class="rnn" />
+  <text x="570" y="330" class="small-label">NavRnn (GRU)</text>
+  
+  <rect x="680" y="310" width="100" height="30" class="controller" />
+  <text x="730" y="330" class="small-label">低级控制信号</text>
+  
+  <!-- NavRnn Detail -->
+  <rect x="50" y="400" width="400" height="150" class="rnn" rx="10" />
+  <text x="250" y="420" class="subtitle">NavRnn 核心组件详情</text>
+  
+  <rect x="70" y="440" width="80" height="30" class="input" />
+  <text x="110" y="460" class="small-label">输入特征</text>
+  
+  <rect x="170" y="440" width="80" height="30" class="rnn" />
+  <text x="210" y="460" class="small-label">RNN单元</text>
+  
+  <rect x="270" y="440" width="80" height="30" class="rnn" />
+  <text x="310" y="460" class="small-label">隐藏状态</text>
+  
+  <rect x="370" y="440" width="60" height="30" class="output" />
+  <text x="400" y="460" class="small-label">输出</text>
+  
+  <text x="70" y="490" class="small-label">• RNN类型: LSTM/GRU可选</text>
+  <text x="70" y="505" class="small-label">• 隐藏层维度: 512</text>
+  <text x="70" y="520" class="small-label">• 支持双向: 可配置</text>
+  <text x="70" y="535" class="small-label">• Dropout: 训练时启用</text>
+  
+  <!-- Output Layer -->
+  <rect x="300" y="400" width="200" height="50" class="output" />
+  <text x="400" y="425" class="label">动作分数输出</text>
+  <text x="400" y="435" class="small-label">(batch, num_actions)</text>
+  
+  <!-- Hierarchical Control -->
+  <rect x="550" y="400" width="400" height="120" class="fusion" rx="10" />
+  <text x="750" y="420" class="subtitle">分层控制策略</text>
+  
+  <text x="570" y="445" class="small-label">规划器 (高层):</text>
+  <text x="570" y="460" class="small-label">• 长期路径规划</text>
+  <text x="570" y="475" class="small-label">• 子目标生成</text>
+  <text x="570" y="490" class="small-label">• 全局导航策略</text>
+  
+  <text x="750" y="445" class="small-label">控制器 (低层):</text>
+  <text x="750" y="460" class="small-label">• 局部避障</text>
+  <text x="750" y="475" class="small-label">• 精确运动控制</text>
+  <text x="750" y="490" class="small-label">• 实时反应</text>
+  
+  <!-- Loss Functions -->
+  <rect x="100" y="580" width="150" height="60" class="planner" />
+  <text x="175" y="600" class="label">规划器损失</text>
+  <text x="175" y="615" class="small-label">MaskedNLLCriterion</text>
+  <text x="175" y="625" class="small-label">+ 序列掩码</text>
+  
+  <rect x="300" y="580" width="150" height="60" class="controller" />
+  <text x="375" y="600" class="label">控制器损失</text>
+  <text x="375" y="615" class="small-label">MaskedNLLCriterion</text>
+  <text x="375" y="625" class="small-label">+ 动作掩码</text>
+  
+  <rect x="500" y="580" width="150" height="60" class="output" />
+  <text x="575" y="600" class="label">总损失</text>
+  <text x="575" y="615" class="small-label">λ₁×L_planner</text>
+  <text x="575" y="625" class="small-label">+ λ₂×L_controller</text>
+  
+  <!-- Training Strategy -->
+  <rect x="700" y="580" width="250" height="80" class="fusion" />
+  <text x="825" y="600" class="label">训练策略</text>
+  <text x="710" y="620" class="small-label">• 模仿学习 (Imitation Learning)</text>
+  <text x="710" y="635" class="small-label">• 专家轨迹监督</text>
+  <text x="710" y="650" class="small-label">• 分层训练: 先规划器后控制器</text>
+  
+  <!-- Arrows -->
+  <!-- Input to Fusion -->
+  <line x1="110" y1="130" x2="350" y2="165" class="arrow" />
+  <line x1="260" y1="130" x2="370" y2="165" class="arrow" />
+  <line x1="410" y1="130" x2="400" y2="165" class="arrow" />
+  <line x1="560" y1="130" x2="430" y2="165" class="arrow" />
+  <line x1="710" y1="130" x2="450" y2="165" class="arrow" />
+  
+  <!-- Fusion to Modules -->
+  <line x1="350" y1="220" x2="250" y2="265" class="arrow" />
+  <line x1="450" y1="220" x2="650" y2="265" class="arrow" />
+  
+  <!-- Modules to Output -->
+  <line x1="250" y1="350" x2="350" y2="395" class="arrow" />
+  <line x1="650" y1="350" x2="450" y2="395" class="arrow" />
+  
+  <!-- Hierarchical Connection -->
+  <line x1="400" y1="310" x2="520" y2="310" class="hierarchy" />
+  
+  <!-- NavRnn Detail Arrows -->
+  <line x1="150" y1="455" x2="165" y2="455" class="arrow" />
+  <line x1="250" y1="455" x2="265" y2="455" class="arrow" />
+  <line x1="350" y1="455" x2="365" y2="455" class="arrow" />
+  
+  <!-- To Loss Functions -->
+  <line x1="200" y1="350" x2="175" y2="575" class="arrow" />
+  <line x1="700" y1="350" x2="375" y2="575" class="arrow" />
+  <line x1="400" y1="450" x2="575" y2="575" class="arrow" />
+  
+  <!-- Model Info -->
+  <rect x="50" y="700" width="900" height="60" class="fusion" rx="5" />
+  <text x="500" y="720" class="subtitle">模型特点</text>
+  <text x="60" y="740" class="small-label">• 端到端可训练的分层导航架构  • 支持多模态输入融合  • 规划器负责全局路径规划，控制器负责局部精确控制</text>
+  <text x="60" y="755" class="small-label">• 使用专家演示进行模仿学习  • 支持序列到序列的动作预测  • 可配置的RNN类型和网络参数</text>
+</svg>

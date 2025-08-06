@@ -1,0 +1,179 @@
+<svg width="1200" height="900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 20px; font-weight: bold; text-anchor: middle; }
+      .stage-title { font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; text-anchor: middle; }
+      .label { font-family: Arial, sans-serif; font-size: 12px; text-anchor: middle; }
+      .small-label { font-family: Arial, sans-serif; font-size: 10px; text-anchor: middle; }
+      .stage1 { fill: #e3f2fd; stroke: #1976d2; stroke-width: 3; }
+      .stage2 { fill: #f3e5f5; stroke: #7b1fa2; stroke-width: 3; }
+      .stage3 { fill: #e8f5e8; stroke: #388e3c; stroke-width: 3; }
+      .data { fill: #fff3e0; stroke: #f57c00; stroke-width: 2; }
+      .model { fill: #fce4ec; stroke: #c2185b; stroke-width: 2; }
+      .output { fill: #f1f8e9; stroke: #689f38; stroke-width: 2; }
+      .arrow { stroke: #333; stroke-width: 2; marker-end: url(#arrowhead); }
+      .stage-arrow { stroke: #666; stroke-width: 4; marker-end: url(#arrowhead); }
+      .data-flow { stroke: #ff5722; stroke-width: 2; stroke-dasharray: 5,5; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="600" y="30" class="title">IL模块三阶段训练流程</text>
+  
+  <!-- Stage 1: EQA-CNN-Pretrain -->
+  <rect x="50" y="70" width="300" height="200" class="stage1" rx="15" />
+  <text x="200" y="95" class="stage-title">阶段1: EQA-CNN-Pretrain</text>
+  
+  <!-- Stage 1 Components -->
+  <rect x="70" y="110" width="120" height="40" class="data" />
+  <text x="130" y="135" class="label">RGB图像数据</text>
+  
+  <rect x="210" y="110" width="120" height="40" class="data" />
+  <text x="270" y="135" class="label">深度图数据</text>
+  
+  <rect x="70" y="170" width="260" height="40" class="model" />
+  <text x="200" y="195" class="label">MultitaskCNN模型</text>
+  
+  <rect x="70" y="220" width="80" height="30" class="output" />
+  <text x="110" y="240" class="small-label">RGB重建</text>
+  
+  <rect x="160" y="220" width="80" height="30" class="output" />
+  <text x="200" y="240" class="small-label">深度估计</text>
+  
+  <rect x="250" y="220" width="80" height="30" class="output" />
+  <text x="290" y="240" class="small-label">语义分割</text>
+  
+  <!-- Stage 2: Independent Training -->
+  <rect x="450" y="70" width="300" height="200" class="stage2" rx="15" />
+  <text x="600" y="95" class="stage-title">阶段2: 独立训练</text>
+  
+  <!-- VQA Training -->
+  <rect x="470" y="110" width="120" height="60" class="model" />
+  <text x="530" y="135" class="label">VQA模型训练</text>
+  <text x="530" y="150" class="small-label">VqaLstmCnn</text>
+  <text x="530" y="160" class="small-label">AttentionModel</text>
+  
+  <!-- NAV Training -->
+  <rect x="610" y="110" width="120" height="60" class="model" />
+  <text x="670" y="135" class="label">导航模型训练</text>
+  <text x="670" y="150" class="small-label">NavPlanner</text>
+  <text x="670" y="160" class="small-label">ControllerModel</text>
+  
+  <!-- Stage 2 Data -->
+  <rect x="470" y="190" width="120" height="30" class="data" />
+  <text x="530" y="210" class="small-label">EQA问答数据</text>
+  
+  <rect x="610" y="190" width="120" height="30" class="data" />
+  <text x="670" y="210" class="small-label">导航轨迹数据</text>
+  
+  <rect x="470" y="230" width="120" height="30" class="output" />
+  <text x="530" y="250" class="small-label">预训练VQA模型</text>
+  
+  <rect x="610" y="230" width="120" height="30" class="output" />
+  <text x="670" y="250" class="small-label">预训练NAV模型</text>
+  
+  <!-- Stage 3: End-to-End Fine-tuning -->
+  <rect x="850" y="70" width="300" height="200" class="stage3" rx="15" />
+  <text x="1000" y="95" class="stage-title">阶段3: 端到端微调</text>
+  
+  <rect x="870" y="110" width="260" height="40" class="model" />
+  <text x="1000" y="135" class="label">完整EmbodiedQA系统</text>
+  
+  <rect x="870" y="170" width="120" height="30" class="data" />
+  <text x="930" y="190" class="small-label">完整EQA任务</text>
+  
+  <rect x="1010" y="170" width="120" height="30" class="data" />
+  <text x="1070" y="190" class="small-label">端到端数据</text>
+  
+  <rect x="870" y="220" width="260" height="30" class="output" />
+  <text x="1000" y="240" class="small-label">最终EmbodiedQA模型</text>
+  
+  <!-- Stage Arrows -->
+  <line x1="350" y1="170" x2="445" y2="170" class="stage-arrow" />
+  <line x1="750" y1="170" x2="845" y2="170" class="stage-arrow" />
+  
+  <!-- Data Flow from Stage 1 -->
+  <line x1="200" y1="270" x2="530" y2="305" class="data-flow" />
+  <line x1="200" y1="270" x2="670" y2="305" class="data-flow" />
+  
+  <!-- Data Flow from Stage 2 -->
+  <line x1="530" y1="270" x2="950" y2="305" class="data-flow" />
+  <line x1="670" y1="270" x2="1050" y2="305" class="data-flow" />
+  
+  <!-- Training Details -->
+  <rect x="50" y="320" width="350" height="150" class="stage1" rx="10" />
+  <text x="225" y="340" class="stage-title">阶段1训练详情</text>
+  
+  <text x="70" y="360" class="small-label">目标: 学习通用视觉表示</text>
+  <text x="70" y="375" class="small-label">数据: RGB图像 + 深度图 + 语义标签</text>
+  <text x="70" y="390" class="small-label">损失: SmoothL1Loss (重建) + CrossEntropyLoss (分割)</text>
+  <text x="70" y="405" class="small-label">优化器: Adam</text>
+  <text x="70" y="420" class="small-label">输出: 预训练的特征提取器</text>
+  <text x="70" y="435" class="small-label">特点: 多任务学习，提升特征质量</text>
+  <text x="70" y="450" class="small-label">配置: il_eqa_cnn_pretrain.yaml</text>
+  
+  <rect x="425" y="320" width="350" height="150" class="stage2" rx="10" />
+  <text x="600" y="340" class="stage-title">阶段2训练详情</text>
+  
+  <text x="445" y="360" class="small-label">目标: 独立训练VQA和导航模块</text>
+  <text x="445" y="375" class="small-label">VQA: 图像序列 + 问题文本 → 答案</text>
+  <text x="445" y="390" class="small-label">NAV: 多模态输入 → 导航动作</text>
+  <text x="445" y="405" class="small-label">损失: CrossEntropyLoss (VQA) + MaskedNLLCriterion (NAV)</text>
+  <text x="445" y="420" class="small-label">特点: 使用阶段1的预训练特征</text>
+  <text x="445" y="435" class="small-label">配置: il_vqa.yaml + il_pacman.yaml</text>
+  <text x="445" y="450" class="small-label">输出: 专门化的VQA和导航模型</text>
+  
+  <rect x="800" y="320" width="350" height="150" class="stage3" rx="10" />
+  <text x="975" y="340" class="stage-title">阶段3训练详情</text>
+  
+  <text x="820" y="360" class="small-label">目标: 端到端系统优化</text>
+  <text x="820" y="375" class="small-label">输入: 完整EQA任务 (导航+问答)</text>
+  <text x="820" y="390" class="small-label">方法: 联合微调所有组件</text>
+  <text x="820" y="405" class="small-label">损失: 组合损失函数</text>
+  <text x="820" y="420" class="small-label">特点: 保持预训练权重，小学习率微调</text>
+  <text x="820" y="435" class="small-label">输出: 完整的EmbodiedQA系统</text>
+  <text x="820" y="450" class="small-label">评估: 导航成功率 + 问答准确率</text>
+  
+  <!-- Dataset Requirements -->
+  <rect x="50" y="500" width="1100" height="100" class="data" rx="10" />
+  <text x="600" y="520" class="stage-title">数据集需求</text>
+  
+  <text x="70" y="545" class="label">• MatterPort3D场景数据: 提供3D环境和RGB-D图像</text>
+  <text x="70" y="565" class="label">• EQA任务数据: 包含问题、答案、导航轨迹的完整数据集</text>
+  <text x="70" y="585" class="label">• 专家演示: 用于模仿学习的高质量导航轨迹</text>
+  
+  <!-- Training Commands -->
+  <rect x="50" y="630" width="1100" height="120" class="output" rx="10" />
+  <text x="600" y="650" class="stage-title">训练命令示例</text>
+  
+  <text x="70" y="675" class="small-label">阶段1: python -u habitat_baselines/run.py --config-name=il_eqa_cnn_pretrain.yaml</text>
+  <text x="70" y="695" class="small-label">阶段2a: python -u habitat_baselines/run.py --config-name=il_vqa.yaml</text>
+  <text x="70" y="715" class="small-label">阶段2b: python -u habitat_baselines/run.py --config-name=il_pacman.yaml</text>
+  <text x="70" y="735" class="small-label">阶段3: python -u habitat_baselines/run.py --config-name=il_eqa_end_to_end.yaml</text>
+  
+  <!-- Key Features -->
+  <rect x="50" y="780" width="1100" height="80" class="model" rx="10" />
+  <text x="600" y="800" class="stage-title">关键特点</text>
+  
+  <text x="70" y="825" class="label">✓ 分阶段训练策略，避免端到端训练的不稳定性</text>
+  <text x="70" y="845" class="label">✓ 多任务学习提升特征质量  ✓ 模仿学习利用专家演示  ✓ 分层架构支持复杂导航任务</text>
+  
+  <!-- Internal Arrows -->
+  <line x1="130" y1="150" x2="200" y2="165" class="arrow" />
+  <line x1="270" y1="150" x2="200" y2="165" class="arrow" />
+  <line x1="200" y1="210" x2="110" y2="215" class="arrow" />
+  <line x1="200" y1="210" x2="200" y2="215" class="arrow" />
+  <line x1="200" y1="210" x2="290" y2="215" class="arrow" />
+  
+  <line x1="530" y1="175" x2="530" y2="185" class="arrow" />
+  <line x1="670" y1="175" x2="670" y2="185" class="arrow" />
+  <line x1="530" y1="225" x2="530" y2="225" class="arrow" />
+  <line x1="670" y1="225" x2="670" y2="225" class="arrow" />
+  
+  <line x1="1000" y1="155" x2="930" y2="165" class="arrow" />
+  <line x1="1000" y1="155" x2="1070" y2="165" class="arrow" />
+  <line x1="1000" y1="205" x2="1000" y2="215" class="arrow" />
+</svg>
