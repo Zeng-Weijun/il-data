@@ -60,10 +60,13 @@ def get_data_explanation(name: str, data_type: str) -> str:
         # === 观测数据 ===
         'jaw_rgb_data': '🤖 机械臂末端摄像头RGB图像序列 - 从batch["agent_0_articulated_agent_jaw_rgb"]收集，转换为uint8格式，形状(T,H,W,C)',
         'jaw_depth_data': '📏 机械臂末端摄像头深度图像序列 - 从batch["agent_0_articulated_agent_jaw_depth"]收集，float32格式，形状(T,H,W,1)',
-        'topdown_map': '🗺️ 俯视图地图数据 - 显示环境布局和智能体位置的鸟瞰图',
+        'topdown_map': '🗺️ 俯视图地图数据 - 字典列表，每个字典包含map、fog_of_war_mask、agent_map_coord、agent_angle等字段',
         'rgb': '🎥 RGB图像序列，每帧包含彩色视觉信息',
         'depth': '📏 深度图像序列，每个像素表示到物体的距离',
-        'map': '🗺️ 环境的俯视图表示，用于导航和定位',
+        'map': '🗺️ 环境的俯视图表示 - uint8数组，形状(H,W)，数值范围[0-44]，表示不同地图元素',
+        'fog_of_war_mask': '🌫️ 战争迷雾遮罩 - bool数组，标记agent已探索和未探索的区域',
+        'agent_map_coord': '📍 Agent地图坐标 - float32数组，形状(2,)，表示agent在topdown地图中的[x,y]位置',
+        'agent_angle': '🧭 Agent朝向角度 - float32值，单位弧度，表示agent在地图中的朝向',
         
         # === 动作和控制数据 ===
         'other_data': '📊 包含动作、奖励、状态等训练相关的核心数据',

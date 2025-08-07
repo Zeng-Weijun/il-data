@@ -145,11 +145,20 @@ def extract_frame_data(episode_data: Dict[str, Any], frame_idx: int) -> Tuple[Op
     # 提取topdown数据
     if 'topdown_map' in episode_data and episode_data['topdown_map'] is not None:
         topdown_data = episode_data['topdown_map']
-        if isinstance(topdown_data, dict) and len(topdown_data) > 0:
-            first_key = list(topdown_data.keys())[0]
-            topdown_array = topdown_data[first_key]
-            if isinstance(topdown_array, np.ndarray) and frame_idx < len(topdown_array):
-                topdown_frame = topdown_array[frame_idx]
+        if isinstance(topdown_data, dict) and 'top_down_map' in topdown_data:
+            topdown_list = topdown_data['top_down_map']
+            if isinstance(topdown_list, list) and frame_idx < len(topdown_list):
+                topdown_dict = topdown_list[frame_idx]
+                if isinstance(topdown_dict, dict) and 'map' in topdown_dict:
+                    topdown_frame = topdown_dict['map']
+                    # 将agent坐标和角度信息添加到metrics中
+                    if 'agent_map_coord' in topdown_dict:
+                        metrics['agent_map_coord'] = topdown_dict['agent_map_coord']
+                    if 'agent_angle' in topdown_dict:
+                        metrics['agent_angle'] = topdown_dict['agent_angle']
+                    # 将fog_of_war_mask添加到metrics中
+                    if 'fog_of_war_mask' in topdown_dict:
+                        metrics['fog_of_war_mask'] = topdown_dict['fog_of_war_mask']
     
     # 提取指标数据
     if 'other_data' in episode_data and episode_data['other_data'] is not None:
@@ -180,7 +189,7 @@ def extract_frame_data(episode_data: Dict[str, Any], frame_idx: int) -> Tuple[Op
 
 def enhance_topdown_with_agents(topdown_frame: np.ndarray, metrics: Dict[str, Any]) -> np.ndarray:
     """
-    在topdown图上标记ego和agent的位置（如果有位置信息）
+    在topdown图上标记ego和agent的位置，并应用fog_of_war_mask
     
     Args:
         topdown_frame: 原始topdown图像
@@ -193,31 +202,74 @@ def enhance_topdown_with_agents(topdown_frame: np.ndarray, metrics: Dict[str, An
         return None
     
     # 复制图像以避免修改原始数据
-    enhanced_frame = topdown_frame.copy()
+    enhanced_frame = topdown_frame.copy().astype(np.float32)
     
-    # 如果是灰度图，转换为RGB
-    if len(enhanced_frame.shape) == 2:
-        enhanced_frame = np.stack([enhanced_frame] * 3, axis=-1)
+    # 创建颜色映射的topdown图像
+    # 根据不同的map值分配不同颜色
+    color_map = {
+        0: [50, 50, 50],      # 障碍物 - 深灰色
+        1: [200, 200, 200],   # 可行走区域 - 浅灰色
+        2: [150, 150, 150],   # 其他地形 - 中灰色
+        4: [100, 150, 100],   # 特殊区域1 - 绿色调
+        6: [150, 100, 100],   # 特殊区域2 - 红色调
+        7: [100, 100, 150],   # 特殊区域3 - 蓝色调
+        14: [200, 150, 100],  # 特殊区域4 - 橙色调
+        24: [150, 200, 100],  # 特殊区域5 - 黄绿色
+        34: [100, 200, 150],  # 特殊区域6 - 青色调
+        44: [200, 100, 150],  # 特殊区域7 - 紫色调
+    }
     
-    # 获取图像尺寸
-    height, width = enhanced_frame.shape[:2]
+    # 创建RGB图像
+    height, width = enhanced_frame.shape
+    rgb_frame = np.zeros((height, width, 3), dtype=np.uint8)
     
-    # 在图像中心标记ego位置（红色圆圈）
-    ego_x, ego_y = width // 2, height // 2
-    cv2.circle(enhanced_frame, (ego_x, ego_y), 8, (255, 0, 0), 2)  # 红色圆圈
-    cv2.circle(enhanced_frame, (ego_x, ego_y), 3, (255, 0, 0), -1)  # 红色实心圆
+    # 应用颜色映射
+    for value, color in color_map.items():
+        mask = enhanced_frame == value
+        rgb_frame[mask] = color
+    
+    # 应用fog_of_war_mask（如果存在）
+    if 'fog_of_war_mask' in metrics:
+        fog_mask = metrics['fog_of_war_mask']
+        if isinstance(fog_mask, np.ndarray) and fog_mask.shape == enhanced_frame.shape:
+            # 将未探索区域设为黑色
+            rgb_frame[fog_mask == 0] = [0, 0, 0]
+    
+    # 标记agent位置
+    if 'agent_map_coord' in metrics and 'agent_angle' in metrics:
+        agent_coords = metrics['agent_map_coord']
+        agent_angles = metrics['agent_angle']
+        
+        if isinstance(agent_coords, list) and isinstance(agent_angles, list):
+            for i, (coord, angle) in enumerate(zip(agent_coords, agent_angles)):
+                if isinstance(coord, (list, tuple)) and len(coord) == 2:
+                    x, y = coord
+                    # 过滤掉无效坐标（负值通常表示无效位置）
+                    if x >= 0 and y >= 0 and x < width and y < height:
+                        if i == 0:  # 第一个agent通常是ego
+                            # ego用红色标记
+                            cv2.circle(rgb_frame, (int(x), int(y)), 8, (255, 0, 0), 2)
+                            cv2.circle(rgb_frame, (int(x), int(y)), 3, (255, 0, 0), -1)
+                            # 绘制朝向箭头
+                            if isinstance(angle, (np.ndarray, float, int)):
+                                angle_val = float(angle) if isinstance(angle, np.ndarray) else angle
+                                arrow_length = 15
+                                end_x = int(x + arrow_length * np.cos(angle_val))
+                                end_y = int(y + arrow_length * np.sin(angle_val))
+                                cv2.arrowedLine(rgb_frame, (int(x), int(y)), (end_x, end_y), (255, 255, 0), 2, tipLength=0.3)
+                        else:
+                            # 其他agent用蓝色标记
+                            cv2.circle(rgb_frame, (int(x), int(y)), 6, (0, 0, 255), 2)
+                            cv2.circle(rgb_frame, (int(x), int(y)), 2, (0, 0, 255), -1)
     
     # 如果有GPS或位置信息，可以标记目标位置（绿色）
     if 'distance_to_goal' in metrics:
         # 在右上角标记目标方向（示例）
         goal_x, goal_y = width - 30, 30
-        cv2.circle(enhanced_frame, (goal_x, goal_y), 6, (0, 255, 0), 2)  # 绿色圆圈
-        cv2.circle(enhanced_frame, (goal_x, goal_y), 2, (0, 255, 0), -1)  # 绿色实心圆
+        cv2.circle(rgb_frame, (goal_x, goal_y), 6, (0, 255, 0), 2)  # 绿色圆圈
+        cv2.circle(rgb_frame, (goal_x, goal_y), 2, (0, 255, 0), -1)  # 绿色实心圆
     
-    # 添加路径轨迹（如果有历史位置信息）
-    # 这里可以根据实际数据格式添加轨迹绘制逻辑
-    
-    return enhanced_frame
+    return rgb_frame
 
 def create_episode_video(episode_data: Dict[str, Any], episode_name: str, output_path: str, fps: int = 10) -> None:
     """
@@ -240,7 +292,11 @@ def create_episode_video(episode_data: Dict[str, Any], episode_name: str, output
             if isinstance(data, dict) and len(data) > 0:
                 first_key = list(data.keys())[0]
                 array_data = data[first_key]
-                if isinstance(array_data, np.ndarray):
+                if data_type == 'topdown_map':
+                    # topdown_map是列表格式
+                    if isinstance(array_data, list):
+                        total_frames = max(total_frames, len(array_data))
+                elif isinstance(array_data, np.ndarray):
                     total_frames = max(total_frames, len(array_data))
     
     if total_frames == 0:
@@ -303,24 +359,10 @@ def create_episode_video(episode_data: Dict[str, Any], episode_name: str, output
         
         # 更新topdown图
         if topdown_frame is not None:
-            # 归一化topdown图像到0-255范围以提高可视性
-            if len(topdown_frame.shape) == 2:
-                # 灰度图，归一化到0-255
-                normalized_topdown = ((topdown_frame - np.min(topdown_frame)) / 
-                                    (np.max(topdown_frame) - np.min(topdown_frame) + 1e-8) * 255).astype(np.uint8)
-                # 转换为RGB格式
-                normalized_topdown = np.stack([normalized_topdown] * 3, axis=-1)
-            else:
-                # 已经是RGB格式，直接归一化
-                normalized_topdown = ((topdown_frame - np.min(topdown_frame)) / 
-                                    (np.max(topdown_frame) - np.min(topdown_frame) + 1e-8) * 255).astype(np.uint8)
-            
-            # 增强topdown图（标记智能体位置）
-            enhanced_topdown = enhance_topdown_with_agents(normalized_topdown, metrics)
-            if enhanced_topdown is not None:
-                topdown_im.set_array(enhanced_topdown)
-            else:
-                topdown_im.set_array(normalized_topdown)
+            # 直接使用enhance_topdown_with_agents函数处理topdown图像
+            # 该函数已经包含了颜色映射和agent标记逻辑
+            enhanced_topdown = enhance_topdown_with_agents(topdown_frame, metrics)
+            topdown_im.set_array(enhanced_topdown)
         else:
             # 显示占位符
             placeholder = np.zeros((224, 224, 3), dtype=np.uint8)

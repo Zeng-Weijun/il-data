@@ -749,20 +749,19 @@ class FALCONEvaluator(Evaluator):
             for info in imitation_learning_data['other_data']['info_data'][env_idx]:
                 if isinstance(info, dict) and 'top_down_map' in info:
                     topdown = info['top_down_map']
-                    if isinstance(topdown, dict) and 'map' in topdown:
-                        # 只保存地图本身，节省空间
-                        topdown_maps.append(topdown['map'])
+                    if isinstance(topdown, dict):
+                        # 保存完整的topdown数据，不进行压缩
+                        topdown_maps.append(topdown)
         
         if topdown_maps:
-            # 将所有帧的topdown地图堆叠成一个数组
-            topdown_sequence = np.stack(topdown_maps, axis=0)  # (T, H, W)
+            # 保存完整的topdown数据序列（包含所有字段）
             topdown_dict = {
-                "top_down_map": topdown_sequence
+                "top_down_map": topdown_maps  # 保存完整的topdown字典列表
             }
             topdown_path = os.path.join(topdown_folder, episode_filename)
             with open(topdown_path, 'wb') as f:
                 pickle.dump(topdown_dict, f)
-            # print(f"[DEBUG] 保存 topdown 序列: shape = {topdown_sequence.shape}, episode {scene_name}_ep{episode_id_num:06d} 到: {main_folder}/topdown_map/")
+            print(f"[DEBUG] 保存完整 topdown 序列: {len(topdown_maps)} 帧，episode {scene_name}_ep{episode_id_num:06d} 到: {main_folder}/topdown_map/")
         else:
             print(f"[DEBUG] 环境 {env_idx} 没有 topdown 数据可保存，episode {scene_name}_ep{episode_id_num:06d}")
         
