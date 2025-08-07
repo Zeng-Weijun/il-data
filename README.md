@@ -221,4 +221,4 @@ We would like to thank the following repositories for their contributions:
 - [Proximity](https://github.com/EnricoCancelli/ProximitySocialNav)
 - [VLFM](https://github.com/bdaiinstitute/vlfm/tree/main)
 - [Habitat-Lab](https://github.com/facebookresearch/habitat-lab)
-- [Habitat-Sim](https://github.com/facebookresearch/habitat-sim)# il-data
+- [Habitat-Sim](https://github.com/facebookresearch/habitat-sim)

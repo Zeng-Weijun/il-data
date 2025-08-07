@@ -294,7 +294,8 @@ class FALCONEvaluator(Evaluator):
                         if rgb_data.dtype != np.uint8:
                             rgb_data = (rgb_data * 255).astype(np.uint8)
                         imitation_learning_data['jaw_rgb_data'][i].append(rgb_data)
-                        # print(f"[DEBUG] 收集 RGB 数据: env={i}, shape={rgb_data.shape}, dtype={rgb_data.dtype}")
+                        # print(f"[DEBUG] 收集 RGB 数据:
+                        #  env={i}, shape={rgb_data.shape}, dtype={rgb_data.dtype}")
                     else:
                         print(f"[DEBUG] 未找到 'agent_0_articulated_agent_jaw_rgb' 键，batch 中的键: {list(batch.keys())}")
                     
@@ -311,12 +312,23 @@ class FALCONEvaluator(Evaluator):
                         print(f"[DEBUG] 未找到 'agent_0_articulated_agent_jaw_depth' 键，batch 中的键: {list(batch.keys())}")
                     
                     # 收集GPS/Compass数据
-                    if 'pointgoal_with_gps_compass' in batch:
+                    gps_key = 'agent_0_pointgoal_with_gps_compass'  # 使用正确的键名
+                    if gps_key in batch:
+                        gps_compass = batch[gps_key][i].cpu().numpy().astype(np.float32)
+                        if len(gps_compass) >= 2:
+                            imitation_learning_data['other_data']['pointgoal_with_gps_compass'][i].append(gps_compass[:2])
+                        else:
+                            imitation_learning_data['other_data']['pointgoal_with_gps_compass'][i].append(gps_compass)
+                        # print(f"[DEBUG] 收集GPS指南针数据: env={i}, shape={gps_compass.shape}, value={gps_compass}")
+                    elif 'pointgoal_with_gps_compass' in batch:  # 备用键名
                         gps_compass = batch['pointgoal_with_gps_compass'][i].cpu().numpy().astype(np.float32)
                         if len(gps_compass) >= 2:
                             imitation_learning_data['other_data']['pointgoal_with_gps_compass'][i].append(gps_compass[:2])
                         else:
                             imitation_learning_data['other_data']['pointgoal_with_gps_compass'][i].append(gps_compass)
+                        print(f"[DEBUG] 收集GPS指南针数据(备用键): env={i}, shape={gps_compass.shape}, value={gps_compass}")
+                    else:
+                        print(f"[DEBUG] 未找到GPS指南针键，batch 中的键: {list(batch.keys())}")
                     
                     # 收集动作数据（从之前保存的动作中获取）
                     if len(eval_data_collection['actions']) > 0:
@@ -474,7 +486,8 @@ class FALCONEvaluator(Evaluator):
                             current_episodes_info[i], 
                             episode_stats, 
                             i, 
-                            checkpoint_index
+                            checkpoint_index,
+                            eval_data_collection
                         )
                     else:
                         print(f"[DEBUG] 跳过保存，_save_eval_data = {self._save_eval_data}")
@@ -680,7 +693,7 @@ class FALCONEvaluator(Evaluator):
         logger.info(f"Evaluation data saved to {save_path}")
         logger.info(f"Evaluation stats saved to {stats_path}")
     
-    def _save_imitation_learning_data(self, imitation_learning_data, episode_info, episode_stats, env_idx, checkpoint_index):
+    def _save_imitation_learning_data(self, imitation_learning_data, episode_info, episode_stats, env_idx, checkpoint_index, eval_data_collection=None):
         """保存模仿学习数据，按照统一时间戳目录结构保存"""
         
         # 创建主保存目录（使用统一时间戳）
@@ -712,7 +725,7 @@ class FALCONEvaluator(Evaluator):
             rgb_path = os.path.join(jaw_rgb_folder, episode_filename)
             with open(rgb_path, 'wb') as f:
                 pickle.dump(rgb_dict, f)
-            print(f"[DEBUG] 保存 RGB 数据: shape = {rgb_data.shape}, episode {scene_name}_ep{episode_id_num:06d} 到: {main_folder}/jaw_rgb_data/")
+            # print(f"[DEBUG] 保存 RGB 数据: shape = {rgb_data.shape}, episode {scene_name}_ep{episode_id_num:06d} 到: {main_folder}/jaw_rgb_data/")
         else:
             print(f"[DEBUG] 环境 {env_idx} 没有 RGB 数据可保存，episode {scene_name}_ep{episode_id_num:06d}")
         
@@ -725,7 +738,7 @@ class FALCONEvaluator(Evaluator):
             depth_path = os.path.join(jaw_depth_folder, episode_filename)
             with open(depth_path, 'wb') as f:
                 pickle.dump(depth_dict, f)
-            print(f"[DEBUG] 保存深度数据: shape = {depth_data.shape}, episode {scene_name}_ep{episode_id_num:06d} 到: {main_folder}/jaw_depth_data/")
+            # print(f"[DEBUG] 保存深度数据: shape = {depth_data.shape}, episode {scene_name}_ep{episode_id_num:06d} 到: {main_folder}/jaw_depth_data/")
         else:
             print(f"[DEBUG] 环境 {env_idx} 没有深度数据可保存，episode {scene_name}_ep{episode_id_num:06d}")
         
@@ -749,7 +762,7 @@ class FALCONEvaluator(Evaluator):
             topdown_path = os.path.join(topdown_folder, episode_filename)
             with open(topdown_path, 'wb') as f:
                 pickle.dump(topdown_dict, f)
-            print(f"[DEBUG] 保存 topdown 序列: shape = {topdown_sequence.shape}, episode {scene_name}_ep{episode_id_num:06d} 到: {main_folder}/topdown_map/")
+            # print(f"[DEBUG] 保存 topdown 序列: shape = {topdown_sequence.shape}, episode {scene_name}_ep{episode_id_num:06d} 到: {main_folder}/topdown_map/")
         else:
             print(f"[DEBUG] 环境 {env_idx} 没有 topdown 数据可保存，episode {scene_name}_ep{episode_id_num:06d}")
         
@@ -771,29 +784,127 @@ class FALCONEvaluator(Evaluator):
             masks = np.array(imitation_learning_data['other_data']['masks'][env_idx], dtype=np.float64)  # (T,)
             other_data_dict['masks'] = masks
         
-        # Info数据（移除topdown_map以减少冗余）
+        # Info数据（转换为numpy数组格式，与其他数据保持一致）
         if imitation_learning_data['other_data']['info_data'][env_idx]:
-            # 创建不包含topdown_map的info_data副本
-            cleaned_info_data = []
-            for info in imitation_learning_data['other_data']['info_data'][env_idx]:
-                if isinstance(info, dict):
-                    # 创建副本并移除top_down_map
-                    cleaned_info = {k: v for k, v in info.items() if k != 'top_down_map'}
-                    cleaned_info_data.append(cleaned_info)
-                else:
-                    cleaned_info_data.append(info)
-            other_data_dict['info_data'] = cleaned_info_data
+            info_data_list = imitation_learning_data['other_data']['info_data'][env_idx]
+            if info_data_list and isinstance(info_data_list[0], dict):
+                # 提取所有数值字段并转换为numpy数组
+                info_arrays = {}                
+                # 获取第一个info字典的所有键（除了top_down_map）
+                sample_info = info_data_list[0]
+                for key in sample_info.keys():
+                    if key == 'top_down_map':  # 跳过topdown_map以减少冗余
+                        continue
+                    
+                    # 收集所有时间步的该字段值
+                    values = []
+                    for info in info_data_list:
+                        if isinstance(info, dict) and key in info:
+                            values.append(info[key])
+                        else:
+                            values.append(None)  # 缺失值用None填充
+                    
+                    # 尝试转换为numpy数组
+                    try:
+                        if all(v is not None for v in values):
+                            # 检查数据类型
+                            if all(isinstance(v, (int, float, bool)) for v in values):
+                                # 标量数值数据
+                                info_arrays[key] = np.array(values, dtype=np.float64)
+                            elif all(isinstance(v, np.ndarray) for v in values):
+                                # numpy数组数据
+                                info_arrays[key] = np.stack(values, axis=0)
+                            else:
+                                # 其他类型保持原格式
+                                info_arrays[key] = values
+                        else:
+                            # 包含None值，保持原格式
+                            info_arrays[key] = values
+                    except Exception as e:
+                        # 转换失败，保持原格式
+                        print(f"[DEBUG] 无法将info字段 {key} 转换为numpy数组: {e}")
+                        info_arrays[key] = values
+                
+                other_data_dict['info_data'] = info_arrays
+                print(f"[DEBUG] 保存info数据为numpy数组格式，包含字段: {list(info_arrays.keys())}")
+            else:
+                # 如果不是字典列表，保持原格式
+                other_data_dict['info_data'] = info_data_list
         
         # GPS/Compass数据
         if imitation_learning_data['other_data']['pointgoal_with_gps_compass'][env_idx]:
             gps_compass = np.stack(imitation_learning_data['other_data']['pointgoal_with_gps_compass'][env_idx], axis=0)  # (T, 2)
             other_data_dict['agent_0_pointgoal_with_gps_compass'] = gps_compass
+            # print(f"[DEBUG] 保存GPS指南针数据: shape = {gps_compass.shape}, dtype = {gps_compass.dtype}")
+        else:
+            print(f"[DEBUG] 环境 {env_idx} 没有GPS指南针数据可保存，数据长度: {len(imitation_learning_data['other_data']['pointgoal_with_gps_compass'][env_idx])}")
         
         # Episode统计信息
         other_data_dict['episode_stats'] = episode_stats
         other_data_dict['scene_id'] = episode_info.scene_id
         other_data_dict['episode_id'] = episode_info.episode_id
         other_data_dict['checkpoint_index'] = checkpoint_index
+        
+        # 添加全局评估数据（如果提供了eval_data_collection）
+        if eval_data_collection is not None:
+            # 全局动作数据
+            if eval_data_collection.get('actions') is not None:
+                actions_tensor = eval_data_collection['actions']
+                if isinstance(actions_tensor, list) and len(actions_tensor) > 0:
+                    # 将动作列表堆叠成tensor
+                    global_actions = torch.stack(actions_tensor, dim=0).cpu().numpy()  # (T, envs, action_dim)
+                    other_data_dict['global_actions'] = global_actions
+                elif hasattr(actions_tensor, 'numpy'):
+                    # 如果已经是tensor
+                    other_data_dict['global_actions'] = actions_tensor.cpu().numpy()
+                elif hasattr(actions_tensor, 'tolist'):
+                    # 如果是其他可转换类型
+                    other_data_dict['global_actions'] = actions_tensor.tolist()
+            
+            # 全局奖励数据
+            if eval_data_collection.get('rewards') is not None:
+                rewards_data = eval_data_collection['rewards']
+                if isinstance(rewards_data, list):
+                    # 如果是episode奖励列表
+                    global_rewards = []
+                    for episode_reward_info in rewards_data:
+                        if isinstance(episode_reward_info, dict):
+                            total_reward = episode_reward_info.get('total_reward', 0.0)
+                            global_rewards.append(total_reward)
+                        else:
+                            global_rewards.append(float(episode_reward_info))
+                    other_data_dict['global_rewards'] = np.array(global_rewards, dtype=np.float64)
+                elif hasattr(rewards_data, 'numpy'):
+                    other_data_dict['global_rewards'] = rewards_data.cpu().numpy()
+                elif hasattr(rewards_data, 'tolist'):
+                    other_data_dict['global_rewards'] = rewards_data.tolist()
+            
+            # 全局mask数据
+            if eval_data_collection.get('masks') is not None:
+                masks_data = eval_data_collection['masks']
+                if hasattr(masks_data, 'numpy'):
+                    other_data_dict['global_masks'] = masks_data.cpu().numpy()
+                elif hasattr(masks_data, 'tolist'):
+                    other_data_dict['global_masks'] = masks_data.tolist()
+                elif isinstance(masks_data, list):
+                    other_data_dict['global_masks'] = np.array(masks_data, dtype=np.float64)
+            
+            # 运行时episode统计信息
+            if eval_data_collection.get('running_episode_stats') is not None:
+                running_stats = eval_data_collection['running_episode_stats']
+                if isinstance(running_stats, dict):
+                    # 转换为可pickle的格式
+                    converted_stats = {}
+                    for key, value in running_stats.items():
+                        if hasattr(value, 'numpy'):
+                            converted_stats[key] = value.cpu().numpy()
+                        elif hasattr(value, 'tolist'):
+                            converted_stats[key] = value.tolist()
+                        else:
+                            converted_stats[key] = value
+                    other_data_dict['running_episode_stats'] = converted_stats
+                else:
+                    other_data_dict['running_episode_stats'] = running_stats
         
         # 保存其他数据
         other_path = os.path.join(other_folder, episode_filename)

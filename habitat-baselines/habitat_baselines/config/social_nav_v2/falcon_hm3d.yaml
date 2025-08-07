@@ -105,13 +105,14 @@ habitat_baselines:
   num_checkpoints: 200
   force_torch_single_threaded: True
   load_resume_state_config: False
+  train_ckpt_path_dir: ""  # 禁用resume state加载
 
   evaluator:
     _target_: habitat_baselines.rl.ppo.falcon_evaluator.FALCONEvaluator
 
   eval:
     use_ckpt_config: False
-    should_load_ckpt: True
+    should_load_ckpt: False
     split: train  # 确保评估时使用训练数据集
     # video_option: ["disk"]
     # 以下为新增，用于控制评估时保存数据
