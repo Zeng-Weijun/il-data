@@ -36,6 +36,18 @@ class WBConfig(HabitatBaselinesBaseConfig):
 
 
 @dataclass
+class ILSaveFilterConfig(HabitatBaselinesBaseConfig):
+    """Configuration for IL data saving filter based on episode-level metrics."""
+    enabled: bool = True
+    min_total_score: float = 0.65
+    require_success: bool = False
+    min_steps: int = 1
+    psc_threshold_m: float = 1.0
+    debug_log: bool = True
+    append_metric_to_filename: bool = False
+
+
+@dataclass
 class EvalConfig(HabitatBaselinesBaseConfig):
     # The split to evaluate on
     split: str = "val"
@@ -56,6 +68,8 @@ class EvalConfig(HabitatBaselinesBaseConfig):
     save_observations: bool = True
     save_episode_info: bool = True
     save_rewards: bool = True
+    # IL data saving filter configuration
+    il_save_filter: ILSaveFilterConfig = ILSaveFilterConfig()
 
 
 @dataclass

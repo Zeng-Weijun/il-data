@@ -34,6 +34,26 @@ from datetime import datetime
 from habitat_baselines.rl.ddppo.ddp_utils import rank0_only
 import pickle
 
+# Episode级指标计算函数
+def _metric_sr(final_info):      # 0/1
+    return float(final_info.get("success", 0.0))
+
+def _metric_spl(final_info):     # 0~1，直接用 info['spl']，缺失则 0
+    return float(final_info.get("spl", 0.0))
+
+def _metric_psc(step_min_human_dists, thr=1.0):  # PSC = 满足 min_dist>=thr 的步占比
+    if not step_min_human_dists:
+        return 0.0
+    import numpy as np
+    d = np.asarray(step_min_human_dists, dtype=float)
+    return float((d >= thr).mean())
+
+def _metric_hcoll(step_human_collision_flags):   # 是否出现过任一人-机碰撞
+    return float(any(bool(x) for x in step_human_collision_flags))
+
+def _metric_total(sr, spl, psc):                 # 0.4*SR + 0.3*SPL + 0.3*PSC
+    return 0.4*sr + 0.3*spl + 0.3*psc
+
 class FALCONEvaluator(Evaluator):
     """
     Only difference is record the success rate of each episode while evaluating.
@@ -157,6 +177,11 @@ class FALCONEvaluator(Evaluator):
                 'pointgoal_with_gps_compass': [[] for _ in range(envs.num_envs)]
             }
         }
+        
+        # 初始化per-env指标缓存（用于episode级过滤）
+        per_env_min_human_dists = [[] for _ in range(envs.num_envs)]
+        per_env_human_collisions = [[] for _ in range(envs.num_envs)]
+        per_env_steps = [0 for _ in range(envs.num_envs)]
         
         while (
             len(stats_episodes) < (number_of_eval_episodes * evals_per_ep)
@@ -351,6 +376,26 @@ class FALCONEvaluator(Evaluator):
                     info_copy = infos[i].copy() if i < len(infos) else {}
                     imitation_learning_data['other_data']['info_data'][i].append(info_copy)
 
+            # 收集per-env指标数据（用于episode级过滤）
+            for i in range(envs.num_envs):
+                # 1) 最小人距：优先读 info
+                if i < len(infos) and 'min_human_distance' in infos[i]:
+                    md = float(infos[i]['min_human_distance'])
+                else:
+                    # 如无该键，可用近似兜底：若 info 中有人位姿则计算欧氏距离；都没有则置为 +inf
+                    md = float('inf')
+                per_env_min_human_dists[i].append(md)
+                
+                # 2) 人碰撞：优先读 info
+                if i < len(infos) and 'human_collision' in infos[i]:
+                    hc = bool(infos[i]['human_collision'])
+                else:
+                    # 兜底：若 md < 0.55(≈0.3+0.25)，认为接触（仅作为近似）
+                    hc = (md < 0.55)
+                per_env_human_collisions[i].append(hc)
+                
+                per_env_steps[i] += 1
+
             not_done_masks = torch.tensor(
                 [[not done] for done in dones],
                 dtype=torch.bool,
@@ -477,26 +522,76 @@ class FALCONEvaluator(Evaluator):
                             current_episodes_info[i].episode_id,
                         )
                     
-                    # 保存模仿学习数据（按照用户要求的格式）
+                    # Episode级指标过滤和保存决策
                     print(f"[DEBUG] Episode 结束，检查保存条件: _save_eval_data = {self._save_eval_data}")
                     if self._save_eval_data:
-                        print(f"[DEBUG] 开始保存模仿学习数据，环境 {i}")
-                        self._save_imitation_learning_data(
-                            imitation_learning_data, 
-                            current_episodes_info[i], 
-                            episode_stats, 
-                            i, 
-                            checkpoint_index,
-                            eval_data_collection
-                        )
+                        # 获取过滤配置
+                        F = getattr(config.habitat_baselines.eval, 'il_save_filter', None)
+                        F = F if F is not None else type('obj', (), {'enabled': False})()
+                        
+                        # 计算指标（最后一帧 info 或你已有的 disp_info）
+                        sr = _metric_sr(disp_info)
+                        spl = _metric_spl(disp_info)
+                        psc = _metric_psc(per_env_min_human_dists[i], thr=getattr(F, 'psc_threshold_m', 1.0))
+                        hcoll = _metric_hcoll(per_env_human_collisions[i])
+                        total = _metric_total(sr, spl, psc)
+                        T = per_env_steps[i]
+                        
+                        # 决策：仅在 enabled 时应用过滤；否则保持现有全保存
+                        keep = True
+                        if getattr(F, 'enabled', False):
+                            cond_len   = (T >= getattr(F, 'min_steps', 1))
+                            cond_total = (total >= getattr(F, 'min_total_score', 0.0))
+                            cond_succ  = (not getattr(F, 'require_success', False)) or (sr >= 1.0)
+                            keep = cond_len and cond_total and cond_succ
+                        
+                        # Debug 行（按需）
+                        if getattr(F, 'debug_log', True):
+                            print(
+                                f"[IL-FILTER][EP-END] scene={current_episodes_info[i].scene_id}, "
+                                f"ep={current_episodes_info[i].episode_id}, T={T}, "
+                                f"SR={sr:.2f}, SPL={spl:.2f}, PSC={psc:.2f}, H-Coll={hcoll:.0f}, "
+                                f"Total={total:.3f}, keep={'YES' if keep else 'NO'}, "
+                                f"reason={'ok' if keep else 'filtered'}"
+                            )
+                        
+                        # 根据 keep 决定是否落盘
+                        if keep:
+                            # 将指标塞进 other_data 的字典（不改变现有字段，只新增 metrics）
+                            extra_metrics = {
+                                'SR': sr, 'SPL': spl, 'PSC': psc, 'H-Coll': hcoll,
+                                'Total': total, 'T': int(T)
+                            }
+                            print(f"[DEBUG] 开始保存模仿学习数据，环境 {i}")
+                            self._save_imitation_learning_data(
+                                imitation_learning_data,
+                                current_episodes_info[i],
+                                episode_stats,
+                                i,
+                                checkpoint_index,
+                                eval_data_collection,
+                                extra_metrics=extra_metrics,
+                                append_metric_to_filename=getattr(F, 'append_metric_to_filename', False)
+                            )
+                        else:
+                            print(f"[DEBUG] 跳过保存，episode被过滤，环境 {i}")
+                            # 直接丢弃本 env 的缓存（重置内存队列），不写盘
+                            imitation_learning_data['jaw_rgb_data'][i] = []
+                            imitation_learning_data['jaw_depth_data'][i] = []
+                            for k in imitation_learning_data['other_data']:
+                                imitation_learning_data['other_data'][k][i] = []
                     else:
                         print(f"[DEBUG] 跳过保存，_save_eval_data = {self._save_eval_data}")
-                        
                         # 清空当前环境的数据，为下一个episode做准备
                         imitation_learning_data['jaw_rgb_data'][i] = []
                         imitation_learning_data['jaw_depth_data'][i] = []
                         for key in imitation_learning_data['other_data']:
                             imitation_learning_data['other_data'][key][i] = []
+                    
+                    # 无论 keep 与否，清空 per-env 指标缓存
+                    per_env_min_human_dists[i].clear()
+                    per_env_human_collisions[i].clear()
+                    per_env_steps[i] = 0
 
             not_done_masks = not_done_masks.to(device=device)
             (
@@ -693,7 +788,7 @@ class FALCONEvaluator(Evaluator):
         logger.info(f"Evaluation data saved to {save_path}")
         logger.info(f"Evaluation stats saved to {stats_path}")
     
-    def _save_imitation_learning_data(self, imitation_learning_data, episode_info, episode_stats, env_idx, checkpoint_index, eval_data_collection=None):
+    def _save_imitation_learning_data(self, imitation_learning_data, episode_info, episode_stats, env_idx, checkpoint_index, eval_data_collection=None, extra_metrics=None, append_metric_to_filename=False):
         """保存模仿学习数据，按照统一时间戳目录结构保存"""
         
         # 创建主保存目录（使用统一时间戳）
@@ -715,6 +810,12 @@ class FALCONEvaluator(Evaluator):
         scene_name = os.path.splitext(os.path.basename(episode_info.scene_id))[0]
         episode_id_num = int(episode_info.episode_id) if episode_info.episode_id.isdigit() else hash(episode_info.episode_id) % 1000000
         episode_filename = f"{scene_name}_ep{episode_id_num:06d}.pkl"
+        
+        # 如需将精简指标附到文件名（可控，默认关）
+        if append_metric_to_filename and extra_metrics is not None:
+            # 只拼接少量短字段，避免文件名过长
+            suffix = f"_SR{int(extra_metrics['SR'])}_SPL{extra_metrics['SPL']:.2f}_PSC{extra_metrics['PSC']:.2f}_T{int(extra_metrics['T'])}"
+            episode_filename = episode_filename.replace(".pkl", f"{suffix}.pkl")
         
         # 1. 保存RGB图像数据
         if imitation_learning_data['jaw_rgb_data'][env_idx]:
@@ -843,6 +944,10 @@ class FALCONEvaluator(Evaluator):
         other_data_dict['scene_id'] = episode_info.scene_id
         other_data_dict['episode_id'] = episode_info.episode_id
         other_data_dict['checkpoint_index'] = checkpoint_index
+        
+        # 添加指标数据（如果提供了extra_metrics）
+        if extra_metrics is not None:
+            other_data_dict['metrics'] = extra_metrics
         
         # 添加全局评估数据（如果提供了eval_data_collection）
         if eval_data_collection is not None:

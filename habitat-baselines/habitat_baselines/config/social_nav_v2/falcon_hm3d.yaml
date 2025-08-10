@@ -121,6 +121,15 @@ habitat_baselines:
     save_episode_info: true     # 保存每个episode的信息
     save_rewards: true          # 保存奖励序列
 
+    il_save_filter:
+      enabled: true              # 开关：true=按指标筛；false=保持现有行为全保存
+      min_total_score: 0.9      # Total = 0.4*SR + 0.3*SPL + 0.3*PSC 的阈值
+      require_success: true     # 若 true，则 SR 必须==1 才能保存
+      min_steps: 100               # 最短步数（保证尽量长：完整 episode 已满足，此处仅防极短）
+      psc_threshold_m: 1.0       # PSC 阈值（题述：1.0m，含0.3m人半径+0.25m机器人半径）
+      debug_log: true            # 采集结束打印每个 episode 的调试行
+      append_metric_to_filename: true  # 如需把简要指标附到 other_data 文件名，可置 true
+
   rl:
     agent:
       type: "MultiAgentAccessMgr"
